@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>宜蘭 6 棟民宿園區｜定價模擬器（假設模型）</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --card: #ffffff; --ink: #1f2328; --muted: #6b7078;
+    --line: #e3e1da; --accent: #2f6f5e; --accent2: #c2662d; --grid: #ecebe6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181b; --card: #1f2226; --ink: #e8e6e1; --muted: #9aa0a6;
+      --line: #33373c; --accent: #5fb39b; --accent2: #e08a50; --grid: #2a2d31;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+    line-height: 1.55;
+  }
+  header { max-width: 1180px; margin: 0 auto; padding: 28px 20px 8px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: .92rem; margin: 0; }
+  .tag { display: inline-block; font-size: .72rem; padding: 1px 6px; border-radius: 4px;
+         background: color-mix(in srgb, var(--accent2) 15%, transparent); color: var(--accent2);
+         margin-left: 4px; vertical-align: 1px; white-space: nowrap; }
+  main { max-width: 1180px; margin: 0 auto; padding: 12px 20px 40px;
+         display: grid; grid-template-columns: 360px 1fr; gap: 18px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+  .card h2 { font-size: 1rem; margin: 0 0 12px; }
+  .ctrl { margin-bottom: 16px; }
+  .ctrl label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: .9rem; }
+  .ctrl .val { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--accent); white-space: nowrap; }
+  .ctrl .hint { font-size: .76rem; color: var(--muted); margin-top: 2px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); margin: 6px 0 0; }
+  select { width: 100%; margin-top: 6px; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--line);
+           background: var(--card); color: var(--ink); font: inherit; font-size: .9rem; }
+  .price-ctrl { padding: 12px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 8%, transparent);
+                margin-bottom: 18px; }
+  .price-ctrl .val { font-size: 1.15rem; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+  @media (max-width: 600px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+  .kpi { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  .kpi .k { font-size: .76rem; color: var(--muted); }
+  .kpi .v { font-size: 1.25rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .kpi .s { font-size: .74rem; color: var(--muted); }
+  .chart-wrap { position: relative; width: 100%; height: 360px; }
+  canvas { width: 100%; height: 100%; display: block; }
+  .verdict { margin-top: 14px; padding: 14px 16px; border-left: 4px solid var(--accent2);
+             background: color-mix(in srgb, var(--accent2) 8%, transparent); border-radius: 0 8px 8px 0;
+             font-size: 1rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; }
+  td.num, th.num { text-align: right; }
+  tr.top td { font-weight: 650; color: var(--accent2); }
+  .right { display: flex; flex-direction: column; gap: 18px; }
+  .note { font-size: .8rem; color: var(--muted); }
+  .note code { font-size: .78rem; }
+  .legend { display: flex; gap: 16px; font-size: .78rem; color: var(--muted); margin-bottom: 6px; flex-wrap: wrap; }
+  .legend span::before { content: ""; display: inline-block; width: 14px; height: 3px; margin-right: 5px;
+                         vertical-align: middle; background: currentColor; }
+  .lg-rev { color: var(--accent); } .lg-cur { color: var(--muted); } .lg-max { color: var(--accent2); }
+</style>
+</head>
+<body>
+<header>
+  <h1>宜蘭 6 棟民宿園區・定價模擬器</h1>
+  <p class="sub">所有數字、係數與結果都是<b>假設</b>，只用來示範需求彈性的觀念，並非真實市場資料。</p>
+</header>
+
+<main>
+  <!-- 左：控制面板 -->
+  <section class="card" id="controls">
+    <div class="ctrl price-ctrl">
+      <label>每棟一晚價格 <span class="tag">假設</span><span class="val" id="v-price"></span></label>
+      <input type="range" id="price" min="2000" max="12000" step="100" value="4500">
+      <div class="hint">6 棟採同一價格；每晚最多賣出 6 棟</div>
+    </div>
+
+    <h2>影響因子</h2>
+
+    <div class="ctrl">
+      <label>宜蘭民宿供給量變化 <span class="tag">假設</span><span class="val" id="v-supply"></span></label>
+      <input type="range" id="supply" min="-10" max="60" step="1" value="20">
+      <div class="hint">相對基準年的家數變化；供給越多 → 需求被分走、客人更比價（彈性變大）</div>
+    </div>
+
+    <div class="ctrl">
+      <label>台灣 GDP 成長率 <span class="tag">假設</span><span class="val" id="v-gdp"></span></label>
+      <input type="range" id="gdp" min="-4" max="8" step="0.1" value="2.5">
+      <div class="hint">以所得彈性處理：所得變動 = 成長率 − 2%（中性）</div>
+    </div>
+
+    <div class="ctrl">
+      <label>台股走勢（年報酬） <span class="tag">假設</span><span class="val" id="v-stock"></span></label>
+      <input type="range" id="stock" min="-40" max="40" step="1" value="5">
+      <div class="hint">財富效果：有效所得變動 = 報酬 × 0.3，再套所得彈性</div>
+    </div>
+
+    <div class="ctrl">
+      <label>品牌信任度 <span class="tag">假設</span><span class="val" id="v-trust"></span></label>
+      <input type="range" id="trust" min="0" max="100" step="1" value="60">
+      <div class="hint">信任越高 → 需求越多、客人越不在意價格（彈性變小）</div>
+    </div>
+
+    <div class="ctrl">
+      <label>附近競爭民宿價格 <span class="tag">假設</span><span class="val" id="v-comp"></span></label>
+      <input type="range" id="comp" min="2000" max="12000" step="100" value="4500">
+      <div class="hint">交叉彈性：對手越貴，客人越往我們這裡跑</div>
+    </div>
+
+    <div class="ctrl">
+      <label>季節 <span class="tag">假設</span></label>
+      <select id="season">
+        <option value="off">淡季</option>
+        <option value="peak" selected>旺季</option>
+        <option value="holiday">連假</option>
+      </select>
+    </div>
+
+    <div class="ctrl">
+      <label>天氣 <span class="tag">假設</span></label>
+      <select id="weather">
+        <option value="sunny" selected>晴</option>
+        <option value="rain">雨</option>
+        <option value="typhoon">颱風</option>
+      </select>
+    </div>
+  </section>
+
+  <!-- 右：結果 -->
+  <section class="right">
+    <div class="card">
+      <div class="kpis">
+        <div class="kpi"><div class="k">預估訂房數 <span class="tag">假設</span></div><div class="v" id="k-q"></div><div class="s" id="k-q-s"></div></div>
+        <div class="kpi"><div class="k">每晚總營業額 <span class="tag">假設</span></div><div class="v" id="k-r"></div><div class="s" id="k-r-s"></div></div>
+        <div class="kpi"><div class="k">價格彈性 ε <span class="tag">假設</span></div><div class="v" id="k-e"></div><div class="s" id="k-e-s"></div></div>
+        <div class="kpi"><div class="k">營業額最高的價格 <span class="tag">假設</span></div><div class="v" id="k-p"></div><div class="s" id="k-p-s"></div></div>
+      </div>
+      <div class="legend">
+        <span class="lg-rev">每晚總營業額（假設）</span>
+        <span class="lg-cur">目前價格</span>
+        <span class="lg-max">營業額最高點</span>
+      </div>
+      <div class="chart-wrap"><canvas id="chart"></canvas></div>
+      <div class="verdict" id="verdict"></div>
+    </div>
+
+    <div class="card">
+      <h2>各因子的作用 <span class="tag">全部為假設係數</span></h2>
+      <table>
+        <thead><tr>
+          <th>因子</th><th>目前設定</th>
+          <th class="num">需求倍數</th><th class="num">彈性調整</th>
+          <th class="num">對最高營業額的影響</th>
+        </tr></thead>
+        <tbody id="tbl"></tbody>
+      </table>
+      <p class="note">「對最高營業額的影響」＝把該因子調回中性值（供給 0%、GDP 2%、台股 0%、信任 50、對手價 4,500、季節／天氣倍數 1）後，各自最佳定價下的最高營業額差異。</p>
+    </div>
+
+    <div class="card note">
+      <b>模型（假設）</b><br>
+      訂房數 = min( 6, 基準訂房數 × Π 各因子需求倍數 × (價格 ÷ 參考價)<sup>ε</sup> )<br>
+      基準訂房數 3.6 棟／晚、參考價 NT$4,500、基準價格彈性 −1.3、所得彈性 1.8（休閒住宿視為奢侈財）、
+      財富效果係數 0.3、交叉價格彈性 0.8、彈性限制在 −4.0～−0.2 之間。以上皆為假設。
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  // ===== 假設參數 =====
+  const A = {
+    base: 3.6,        // 基準訂房數（棟／晚）
+    pref: 4500,       // 參考價
+    eps0: -1.3,       // 基準價格彈性
+    eta: 1.8,         // 所得彈性
+    g0: 2,            // 中性 GDP 成長率（%）
+    wealth: 0.3,      // 台股報酬 → 有效所得的轉換係數
+    cross: 0.8,       // 交叉價格彈性
+    pc0: 4500,        // 中性競爭價格
+    cap: 6,           // 最多 6 棟
+    epsMin: -4, epsMax: -0.2,
+    pMin: 2000, pMax: 12000, step: 50
+  };
+  const SEASON = {
+    off:     { name: "淡季", m: 0.60, d: -0.30 },
+    peak:    { name: "旺季", m: 1.25, d: 0.15 },
+    holiday: { name: "連假", m: 1.70, d: 0.45 }
+  };
+  const WEATHER = {
+    sunny:   { name: "晴",   m: 1.05, d: 0.00 },
+    rain:    { name: "雨",   m: 0.80, d: -0.15 },
+    typhoon: { name: "颱風", m: 0.30, d: -0.30 }
+  };
+
+  const $ = id => document.getElementById(id);
+  const fmt = n => "NT$" + Math.round(n).toLocaleString("zh-TW");
+  const pct = (n, d = 0) => (n >= 0 ? "+" : "") + n.toFixed(d) + "%";
+
+  function readState() {
+    return {
+      price: +$("price").value, supply: +$("supply").value, gdp: +$("gdp").value,
+      stock: +$("stock").value, trust: +$("trust").value, comp: +$("comp").value,
+      season: $("season").value, weather: $("weather").value
+    };
+  }
+
+  // 每個因子回傳 { m: 需求倍數, d: 彈性調整 }
+  function factorEffects(s) {
+    const se = SEASON[s.season], we = WEATHER[s.weather];
+    return {
+      supply:  { label: "民宿供給量", setting: pct(s.supply) ,
+                 m: Math.pow(1 + s.supply / 100, -0.5), d: -0.012 * s.supply },
+      gdp:     { label: "GDP 成長率（所得彈性）", setting: s.gdp.toFixed(1) + "%",
+                 m: Math.pow(1 + (s.gdp - A.g0) / 100, A.eta), d: 0 },
+      stock:   { label: "台股走勢（財富→所得彈性）", setting: pct(s.stock),
+                 m: Math.pow(1 + A.wealth * s.stock / 100, A.eta), d: 0 },
+      trust:   { label: "品牌信任度", setting: s.trust + " 分",
+                 m: 0.6 + 0.8 * s.trust / 100, d: 0.012 * (s.trust - 50) },
+      comp:    { label: "競爭民宿價格（交叉彈性）", setting: fmt(s.comp),
+                 m: Math.pow(s.comp / A.pc0, A.cross), d: 0 },
+      season:  { label: "季節", setting: se.name, m: se.m, d: se.d },
+      weather: { label: "天氣", setting: we.name, m: we.m, d: we.d }
+    };
+  }
+
+  function model(effects) {
+    let mult = 1, eps = A.eps0;
+    for (const k in effects) { mult *= effects[k].m; eps += effects[k].d; }
+    eps = Math.min(A.epsMax, Math.max(A.epsMin, eps));
+    const demand = p => A.base * mult * Math.pow(p / A.pref, eps); // 未受產能限制的需求
+    const q = p => Math.min(A.cap, demand(p));
+    const rev = p => p * q(p);
+    let best = { p: A.pMin, r: -1 };
+    for (let p = A.pMin; p <= A.pMax; p += A.step) {
+      const r = rev(p);
+      if (r > best.r + 1e-9) best = { p, r };
+    }
+    return { mult, eps, demand, q, rev, best };
+  }
+
+  const NEUTRAL = { m: 1, d: 0 };
+
+  // ===== 繪圖 =====
+  const canvas = $("chart");
+  const ctx = canvas.getContext("2d");
+  function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+  function niceStep(max, target) {
+    const raw = max / target, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const n = raw / mag;
+    return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag;
+  }
+
+  function draw(M, curPrice) {
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    const pad = { l: 64, r: 18, t: 28, b: 46 };
+    const pw = W - pad.l - pad.r, ph = H - pad.t - pad.b;
+    const pts = [];
+    let maxR = 0;
+    for (let p = A.pMin; p <= A.pMax; p += A.step) {
+      const r = M.rev(p); pts.push([p, r]); if (r > maxR) maxR = r;
+    }
+    const yStep = niceStep(maxR * 1.1 || 1, 5);
+    const yMax = Math.ceil((maxR * 1.12) / yStep) * yStep || yStep;
+    const X = p => pad.l + (p - A.pMin) / (A.pMax - A.pMin) * pw;
+    const Y = r => pad.t + ph - r / yMax * ph;
+
+    const ink = css("--ink"), muted = css("--muted"), grid = css("--grid");
+    const accent = css("--accent"), accent2 = css("--accent2");
+    ctx.font = "12px system-ui, sans-serif";
+
+    // 格線與 y 軸
+    ctx.strokeStyle = grid; ctx.fillStyle = muted; ctx.lineWidth = 1;
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (let v = 0; v <= yMax + 1e-6; v += yStep) {
+      const y = Y(v);
+      ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+      ctx.fillText((v / 10000).toLocaleString("zh-TW", { maximumFractionDigits: 1 }) + " 萬", pad.l - 8, y);
+    }
+    // x 軸
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (let p = A.pMin; p <= A.pMax; p += 2000) {
+      const x = X(p);
+      ctx.beginPath(); ctx.moveTo(x, pad.t + ph); ctx.lineTo(x, pad.t + ph + 5); ctx.strokeStyle = muted; ctx.stroke();
+      ctx.fillText(p.toLocaleString("zh-TW"), x, pad.t + ph + 8);
+    }
+    ctx.strokeStyle = muted;
+    ctx.beginPath(); ctx.moveTo(pad.l, pad.t + ph); ctx.lineTo(W - pad.r, pad.t + ph); ctx.stroke();
+    ctx.fillStyle = muted;
+    ctx.fillText("每棟一晚價格（元，假設）", pad.l + pw / 2, pad.t + ph + 26);
+    ctx.save();
+    ctx.translate(14, pad.t + ph / 2); ctx.rotate(-Math.PI / 2);
+    ctx.textBaseline = "middle"; ctx.fillText("每晚總營業額（元，假設）", 0, 0);
+    ctx.restore();
+
+    // 客滿區（訂房數 = 6）淡色底
+    let fullEnd = null;
+    for (const [p] of pts) if (M.demand(p) >= A.cap) fullEnd = p;
+    if (fullEnd !== null) {
+      ctx.fillStyle = accent + "14";
+      ctx.fillRect(pad.l, pad.t, X(fullEnd) - pad.l, ph);
+      ctx.fillStyle = muted; ctx.textAlign = "left"; ctx.textBaseline = "top";
+      if (X(fullEnd) - pad.l > 60) ctx.fillText("6 棟客滿區", pad.l + 6, pad.t + 4);
+    }
+
+    // 營業額曲線
+    ctx.strokeStyle = accent; ctx.lineWidth = 2.5; ctx.lineJoin = "round";
+    ctx.beginPath();
+    pts.forEach(([p, r], i) => i ? ctx.lineTo(X(p), Y(r)) : ctx.moveTo(X(p), Y(r)));
+    ctx.stroke();
+
+    // 目前價格
+    const cx = X(curPrice), cy = Y(M.rev(curPrice));
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = muted; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx, pad.t); ctx.lineTo(cx, pad.t + ph); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = css("--card"); ctx.strokeStyle = ink; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+    // 最高點
+    const bx = X(M.best.p), by = Y(M.best.r);
+    ctx.fillStyle = accent2;
+    ctx.beginPath(); ctx.arc(bx, by, 6.5, 0, Math.PI * 2); ctx.fill();
+    const label = "最高 " + fmt(M.best.r) + " @ " + fmt(M.best.p);
+    ctx.font = "600 12.5px system-ui, sans-serif";
+    const tw = ctx.measureText(label).width;
+    let lx = bx + 10, ly = by - 22;
+    if (lx + tw > W - pad.r) lx = bx - 10 - tw;
+    if (ly < 4) ly = by + 10;
+    ctx.fillText(label, lx, ly);
+  }
+
+  // ===== 更新 =====
+  function update() {
+    const s = readState();
+    $("v-price").textContent = fmt(s.price);
+    $("v-supply").textContent = pct(s.supply);
+    $("v-gdp").textContent = s.gdp.toFixed(1) + "%";
+    $("v-stock").textContent = pct(s.stock);
+    $("v-trust").textContent = s.trust + " / 100";
+    $("v-comp").textContent = fmt(s.comp);
+
+    const eff = factorEffects(s);
+    const M = model(eff);
+    const q = M.q(s.price), r = M.rev(s.price), full = M.demand(s.price) >= A.cap;
+
+    $("k-q").textContent = q.toFixed(2) + " 棟";
+    $("k-q-s").textContent = "入住率 " + (q / A.cap * 100).toFixed(0) + "%" + (full ? "（客滿）" : "");
+    $("k-r").textContent = fmt(r);
+    $("k-r-s").textContent = "最高可達 " + fmt(M.best.r);
+    $("k-e").textContent = M.eps.toFixed(2);
+    $("k-e-s").textContent = Math.abs(M.eps) > 1 ? "富有彈性（|ε| > 1）" : "缺乏彈性（|ε| < 1）";
+    $("k-p").textContent = fmt(M.best.p);
+    $("k-p-s").textContent = "比目前 " + pct((M.best.p / s.price - 1) * 100);
+
+    // 各因子影響：該因子調回中性後的最高營業額差異
+    const rows = [];
+    for (const k in eff) {
+      const alt = Object.assign({}, eff, { [k]: NEUTRAL });
+      const Mn = model(alt);
+      const impact = (M.best.r / Mn.best.r - 1) * 100;
+      rows.push({ k, ...eff[k], impact });
+    }
+    const top = rows.reduce((a, b) => Math.abs(b.impact) > Math.abs(a.impact) ? b : a);
+    $("tbl").innerHTML = rows.map(x => `
+      <tr class="${x === top ? "top" : ""}">
+        <td>${x.label}</td><td>${x.setting}</td>
+        <td class="num">×${x.m.toFixed(2)}</td>
+        <td class="num">${x.d === 0 ? "—" : (x.d > 0 ? "+" : "") + x.d.toFixed(2)}</td>
+        <td class="num">${pct(x.impact, 1)}</td>
+      </tr>`).join("");
+
+    // 白話結論
+    const elastic = Math.abs(M.eps) > 1;
+    let elasticTxt;
+    if (full) {
+      elasticTxt = `目前 6 棟已客滿，需求被房間數卡住，對你來說等於<b>缺乏彈性</b>（漲一點價也不會少客人；原始彈性 ε≈${M.eps.toFixed(2)}，假設）`;
+    } else {
+      elasticTxt = `目前需求<b>${elastic ? "富有彈性" : "缺乏彈性"}</b>（ε≈${M.eps.toFixed(2)}，假設：價格每變動 1%，訂房數反向變動約 ${Math.abs(M.eps).toFixed(2)}%）`;
+    }
+    const diff = M.best.p - s.price;
+    let action;
+    if (Math.abs(diff) <= 100) action = `目前價格已接近營業額最高點，<b>維持</b>在 ${fmt(s.price)} 左右即可`;
+    else if (diff > 0) action = `建議<b>漲價</b>到約 ${fmt(M.best.p)}，每晚營業額可從 ${fmt(r)} 提高到 ${fmt(M.best.r)}`;
+    else action = `建議<b>降價</b>到約 ${fmt(M.best.p)}，每晚營業額可從 ${fmt(r)} 提高到 ${fmt(M.best.r)}`;
+    const topTxt = `影響最大的因子是「${top.label}：${top.setting}」，讓最高營業額比中性情境${top.impact >= 0 ? "多" : "少"}約 ${Math.abs(top.impact).toFixed(0)}%`;
+    $("verdict").innerHTML = `${elasticTxt}；${action}；${topTxt}。<span class="tag">全部為假設</span>`;
+
+    draw(M, s.price);
+  }
+
+  document.querySelectorAll("input, select").forEach(el => el.addEventListener("input", update));
+  window.addEventListener("resize", update);
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", update);
+  update();
+})();
+</script>
+</body>
+</html>
